@@ -69,6 +69,8 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
             line_end = document.get_iter_at_line(line)
             line_end.forward_to_line_end()
             keyword = None
+            tag_start = line_start
+            tag_end = line_end
             if isinstance(problem, (messages.UnusedImport,
                                     messages.RedefinedWhileUnused,
                                     messages.ImportShadowedByLoopVar,
@@ -83,11 +85,14 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
             elif isinstance(problem, messages.ImportStarUsed):
                 keyword = '*'
             if keyword:
-                tag_start, tag_end = line_start.forward_search(keyword, 0,
+                offset = line_start
+                while offset.in_range(line_start, line_end):
+                    tag_start, tag_end = offset.forward_search(keyword, 0,
                                                                line_end)
-            else:
-                tag_start = line_start
-                tag_end = line_end
+                    if tag_start.starts_word() and tag_end.ends_word():
+                        break
+                    offset.forward_word_end()
+
             tag_type = (self.err_tag if isinstance(problem, PySyntaxError)
                         else self.warn_tag)
             document.apply_tag(tag_type, tag_start, tag_end)
@@ -105,3 +110,4 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
             w = checker.Checker(tree, filename)
             w.messages.sort(key=attrgetter('lineno'))
             return w.messages
+
