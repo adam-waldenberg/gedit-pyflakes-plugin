@@ -110,4 +110,3 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
             w = checker.Checker(tree, filename)
             w.messages.sort(key=attrgetter('lineno'))
             return w.messages
-
