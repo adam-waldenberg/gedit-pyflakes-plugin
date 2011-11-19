@@ -1,7 +1,10 @@
 import ast
-from gi.repository import GObject, Gedit, Pango
+from gi.repository import Gedit
+from gi.repository import GObject
+from gi.repository import Pango
 from operator import attrgetter
-from pyflakes import checker, messages
+from pyflakes import checker
+from pyflakes import messages
 import sys
 
 class BlackHole(object):
