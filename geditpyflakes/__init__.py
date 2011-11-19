@@ -91,12 +91,11 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
                 while offset.in_range(line_start, line_end):
                     tag_start, tag_end = offset.forward_search(keyword, 0,
                                                                line_end)
-                    if not tag_start or not tag_end:
-                        tag_start, tag_end = line_start, line_end
-                        break
                     if tag_start.starts_word() and tag_end.ends_word():
                         break
                     offset.forward_word_end()
+                if not tag_start or not tag_end:
+                    tag_start, tag_end = line_start, line_end
 
             tag_type = (self.err_tag if isinstance(problem, PySyntaxError)
                         else self.warn_tag)
