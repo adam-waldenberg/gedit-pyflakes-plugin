@@ -1,5 +1,5 @@
 [Plugin]
-Loader=python
+Loader=python3
 Module=geditpyflakes
 IAge=3
 Name=Pyflakes Plugin, version 3.0.0
