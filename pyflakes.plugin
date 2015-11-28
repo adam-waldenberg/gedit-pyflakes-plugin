@@ -1,6 +1,7 @@
 [Plugin]
-Loader=python
+Loader=python3
 Module=pyflakes
+Module=geditpyflakes
 IAge=3
 Name=Pyflakes
 Description=Identify common errors quickly without executing Python code.

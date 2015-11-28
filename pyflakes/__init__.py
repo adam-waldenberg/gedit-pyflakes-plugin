@@ -108,7 +108,7 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
         try:
             with BlackHole():
                 tree = ast.parse(text, filename)
-        except SyntaxError, e:
+        except SyntaxError as e:
             return [PySyntaxError(filename, e.lineno, e.offset, e.text)]
         else:
             w = checker.Checker(tree, filename)
