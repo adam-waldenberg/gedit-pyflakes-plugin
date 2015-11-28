@@ -1,8 +1,8 @@
 [Plugin]
 Loader=python
-Module=geditpyflakes
+Module=pyflakes
 IAge=3
-Name=Pyflakes Plugin, version 3.0.0
-Description=It is focused on identifying common errors quickly without executing Python code.
+Name=Pyflakes
+Description=Identify common errors quickly without executing Python code.
 Authors=Gustavo Rezende <nsigustavo@gmail.com>, Patryk Zawadzki <patrys@pld-linux.org>
 Website=https://github.com/patrys/gedit-pyflakes-plugin
