@@ -5,16 +5,6 @@ from gi.repository import Pango
 from operator import attrgetter
 from pyflakes import checker
 from pyflakes import messages
-import sys
-
-class BlackHole(object):
-    write = flush = lambda *args, **kwargs: None
-
-    def __enter__(self):
-        self.stderr, sys.stderr = sys.stderr, self
-
-    def __exit__(self, *args, **kwargs):
-        sys.stderr = self.stderr
 
 
 class PyLocation(object):
@@ -106,8 +96,7 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
         start, end = document.get_bounds()
         text = document.get_text(start, end, True)
         try:
-            with BlackHole():
-                tree = ast.parse(text, filename)
+            tree = ast.parse(text, filename)
         except SyntaxError as e:
             return [PySyntaxError(filename, e.lineno, e.offset, e.text)]
         else:
