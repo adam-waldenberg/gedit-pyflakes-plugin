@@ -64,24 +64,28 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
         end.forward_to_line_end()
         return start, end
 
+    @staticmethod
+    def find_keyword(keyword, start, end):
+       tag_start, tag_end = start, end
+       while start.in_range(start, end):
+           tag_start, tag_end = start.forward_search(keyword, 0, end)
+           if tag_start.starts_word() and tag_end.ends_word():
+               break
+           start.forward_word_end()
+       if not tag_start or not tag_end:
+           return start, end
+       return tag_start, tag_end
+
     def show_errors(self, document):
         try:
             for problem in self.check(document):
                 start, end = PyflakesPlugin.get_line_interval(
                                                   document, problem.lineno - 1)
-                keyword = problem.message_args[0]
-                tag_start, tag_end = start, end
-                offset = start
-                while offset.in_range(start, end):
-                    tag_start, tag_end = offset.forward_search(keyword, 0, end)
-                    if tag_start.starts_word() and tag_end.ends_word():
-                        break
-                    offset.forward_word_end()
-                if not tag_start or not tag_end:
-                    tag_start, tag_end = start, end
+                start, end = PyflakesPlugin.find_keyword(
+                                           problem.message_args[0], start, end)
                 tag_type = self.warn_tag if \
                            isinstance(problem, self.warnings) else self.err_tag
-                document.apply_tag(tag_type, tag_start, tag_end)
+                document.apply_tag(tag_type, start, end)
         except SyntaxError as e:
             start, end = PyflakesPlugin.get_line_interval(
                                                   document, e.lineno - 1)
