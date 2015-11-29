@@ -12,7 +12,21 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
     view = GObject.property(type=Gedit.View)
     document = GObject.property(type=Gedit.Document)
 
+    @staticmethod
+    def find_msg_attr(attributes):
+        located_attributes = []
+        for i in attributes:
+            try:
+                located_attributes.append(getattr(messages, i))
+            except AttributeError:
+                 pass
+        return tuple(located_attributes)
+
     def __init__(self):
+        PYFLAKES_MESSAGES_WARNING = ["AssertTuple", "ImportStarUsage",
+                                     "ImportStarUsed", "UnusedImport",
+                                     "UnusedVariable"]
+        self.warnings = PyflakesPlugin.find_msg_attr(PYFLAKES_MESSAGES_WARNING)
         GObject.Object.__init__(self)
 
     def do_activate(self):
@@ -48,32 +62,20 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
                 line_start = document.get_iter_at_line(line)
                 line_end = document.get_iter_at_line(line)
                 line_end.forward_to_line_end()
-                keyword = None
+                keyword = problem.message_args[0]
                 tag_start, tag_end = line_start, line_end
-                if isinstance(problem, (messages.UnusedImport,
-                                        messages.RedefinedWhileUnused,
-                                        messages.ImportShadowedByLoopVar,
-                                        messages.UndefinedName,
-                                        messages.UndefinedExport,
-                                        messages.UndefinedLocal,
-                                        messages.DuplicateArgument,
-                                        messages.Redefined,
-                                        messages.LateFutureImport,
-                                        messages.UnusedVariable)):
-                    keyword = problem.message_args[0]
-                elif isinstance(problem, messages.ImportStarUsed):
-                    keyword = '*'
-                if keyword:
-                    offset = line_start
-                    while offset.in_range(line_start, line_end):
-                        tag_start, tag_end = offset.forward_search(keyword, 0,
-                                                                   line_end)
-                        if tag_start.starts_word() and tag_end.ends_word():
-                            break
-                        offset.forward_word_end()
-                    if not tag_start or not tag_end:
-                        tag_start, tag_end = line_start, line_end
-                document.apply_tag(self.warn_tag, tag_start, tag_end)
+                offset = line_start
+                while offset.in_range(line_start, line_end):
+                    tag_start, tag_end = offset.forward_search(keyword, 0,
+                                                               line_end)
+                    if tag_start.starts_word() and tag_end.ends_word():
+                        break
+                    offset.forward_word_end()
+                if not tag_start or not tag_end:
+                    tag_start, tag_end = line_start, line_end
+                tag_type = self.warn_tag if \
+                           isinstance(problem, self.warnings) else self.err_tag
+                document.apply_tag(tag_type, tag_start, tag_end)
         except SyntaxError as e:
             line = e.lineno - 1
             line_start = document.get_iter_at_line(line)
