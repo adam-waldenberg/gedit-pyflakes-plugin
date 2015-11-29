@@ -70,7 +70,7 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
                                     messages.UndefinedExport,
                                     messages.UndefinedLocal,
                                     messages.DuplicateArgument,
-                                    messages.RedefinedFunction,
+                                    messages.Redefined,
                                     messages.LateFutureImport,
                                     messages.UnusedVariable)):
                 keyword = problem.message_args[0]
