@@ -7,20 +7,6 @@ from pyflakes import checker
 from pyflakes import messages
 
 
-class PyLocation(object):
-    def __init__(self, lineno, col=None):
-        self.lineno = lineno
-        self.col_offset = col
-
-
-class PySyntaxError(messages.Message):
-    message = 'syntax error in line %d: %s'
-
-    def __init__(self, filename, lineno, col, message):
-        super(PySyntaxError, self).__init__(filename, lineno)
-        self.message_args = (col, message)
-
-
 class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
     __gtype_name__ = 'PyflakesPlugin'
     view = GObject.property(type=Gedit.View)
@@ -56,50 +42,50 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
         self.document.remove_tag(self.warn_tag, *bounds)
 
     def show_errors(self, document):
-        for problem in self.check(document):
-            line = problem.lineno - 1
+        try:
+            for problem in self.check(document):
+                line = problem.lineno - 1
+                line_start = document.get_iter_at_line(line)
+                line_end = document.get_iter_at_line(line)
+                line_end.forward_to_line_end()
+                keyword = None
+                tag_start, tag_end = line_start, line_end
+                if isinstance(problem, (messages.UnusedImport,
+                                        messages.RedefinedWhileUnused,
+                                        messages.ImportShadowedByLoopVar,
+                                        messages.UndefinedName,
+                                        messages.UndefinedExport,
+                                        messages.UndefinedLocal,
+                                        messages.DuplicateArgument,
+                                        messages.Redefined,
+                                        messages.LateFutureImport,
+                                        messages.UnusedVariable)):
+                    keyword = problem.message_args[0]
+                elif isinstance(problem, messages.ImportStarUsed):
+                    keyword = '*'
+                if keyword:
+                    offset = line_start
+                    while offset.in_range(line_start, line_end):
+                        tag_start, tag_end = offset.forward_search(keyword, 0,
+                                                                   line_end)
+                        if tag_start.starts_word() and tag_end.ends_word():
+                            break
+                        offset.forward_word_end()
+                    if not tag_start or not tag_end:
+                        tag_start, tag_end = line_start, line_end
+                document.apply_tag(self.warn_tag, tag_start, tag_end)
+        except SyntaxError as e:
+            line = e.lineno - 1
             line_start = document.get_iter_at_line(line)
             line_end = document.get_iter_at_line(line)
             line_end.forward_to_line_end()
-            keyword = None
-            tag_start, tag_end = line_start, line_end
-            if isinstance(problem, (messages.UnusedImport,
-                                    messages.RedefinedWhileUnused,
-                                    messages.ImportShadowedByLoopVar,
-                                    messages.UndefinedName,
-                                    messages.UndefinedExport,
-                                    messages.UndefinedLocal,
-                                    messages.DuplicateArgument,
-                                    messages.Redefined,
-                                    messages.LateFutureImport,
-                                    messages.UnusedVariable)):
-                keyword = problem.message_args[0]
-            elif isinstance(problem, messages.ImportStarUsed):
-                keyword = '*'
-            if keyword:
-                offset = line_start
-                while offset.in_range(line_start, line_end):
-                    tag_start, tag_end = offset.forward_search(keyword, 0,
-                                                               line_end)
-                    if tag_start.starts_word() and tag_end.ends_word():
-                        break
-                    offset.forward_word_end()
-                if not tag_start or not tag_end:
-                    tag_start, tag_end = line_start, line_end
-
-            tag_type = (self.err_tag if isinstance(problem, PySyntaxError)
-                        else self.warn_tag)
-            document.apply_tag(tag_type, tag_start, tag_end)
+            document.apply_tag(self.err_tag, line_start, line_end)
 
     def check(self, document):
         filename = document.get_short_name_for_display()
         start, end = document.get_bounds()
         text = document.get_text(start, end, True)
-        try:
-            tree = ast.parse(text, filename)
-        except SyntaxError as e:
-            return [PySyntaxError(filename, e.lineno, e.offset, e.text)]
-        else:
-            w = checker.Checker(tree, filename)
-            w.messages.sort(key=attrgetter('lineno'))
-            return w.messages
+        tree = ast.parse(text, filename)
+        w = checker.Checker(tree, filename)
+        w.messages.sort(key=attrgetter('lineno'))
+        return w.messages
