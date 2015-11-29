@@ -55,33 +55,37 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
         self.document.remove_tag(self.err_tag, *bounds)
         self.document.remove_tag(self.warn_tag, *bounds)
 
+    @staticmethod
+    def get_line_interval(document, line):
+        start = document.get_iter_at_line(line)
+        end = document.get_iter_at_line(line)
+        start.forward_to_line_end()
+        start.backward_sentence_start()
+        end.forward_to_line_end()
+        return start, end
+
     def show_errors(self, document):
         try:
             for problem in self.check(document):
-                line = problem.lineno - 1
-                line_start = document.get_iter_at_line(line)
-                line_end = document.get_iter_at_line(line)
-                line_end.forward_to_line_end()
+                start, end = PyflakesPlugin.get_line_interval(
+                                                  document, problem.lineno - 1)
                 keyword = problem.message_args[0]
-                tag_start, tag_end = line_start, line_end
-                offset = line_start
-                while offset.in_range(line_start, line_end):
-                    tag_start, tag_end = offset.forward_search(keyword, 0,
-                                                               line_end)
+                tag_start, tag_end = start, end
+                offset = start
+                while offset.in_range(start, end):
+                    tag_start, tag_end = offset.forward_search(keyword, 0, end)
                     if tag_start.starts_word() and tag_end.ends_word():
                         break
                     offset.forward_word_end()
                 if not tag_start or not tag_end:
-                    tag_start, tag_end = line_start, line_end
+                    tag_start, tag_end = start, end
                 tag_type = self.warn_tag if \
                            isinstance(problem, self.warnings) else self.err_tag
                 document.apply_tag(tag_type, tag_start, tag_end)
         except SyntaxError as e:
-            line = e.lineno - 1
-            line_start = document.get_iter_at_line(line)
-            line_end = document.get_iter_at_line(line)
-            line_end.forward_to_line_end()
-            document.apply_tag(self.err_tag, line_start, line_end)
+            start, end = PyflakesPlugin.get_line_interval(
+                                                  document, e.lineno - 1)
+            document.apply_tag(self.err_tag, start, end)
 
     def check(self, document):
         filename = document.get_short_name_for_display()
