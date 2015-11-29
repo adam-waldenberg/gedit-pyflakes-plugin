@@ -23,9 +23,9 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
         return tuple(located_attributes)
 
     def __init__(self):
-        PYFLAKES_MESSAGES_WARNING = ["AssertTuple", "ImportStarUsage",
-                                     "ImportStarUsed", "UnusedImport",
-                                     "UnusedVariable"]
+        PYFLAKES_MESSAGES_WARNING = ['AssertTuple', 'ImportStarUsage',
+                                     'ImportStarUsed', 'UnusedImport',
+                                     'UnusedVariable']
         self.warnings = PyflakesPlugin.find_msg_attr(PYFLAKES_MESSAGES_WARNING)
         GObject.Object.__init__(self)
 
