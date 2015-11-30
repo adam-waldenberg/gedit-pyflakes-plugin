@@ -17,14 +17,15 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
         located_attributes = []
         for i in attributes:
             try:
-                located_attributes.append(getattr(messages, i))
+                attr = (i[0], i[1]) if isinstance(i, tuple) else (i, None)
+                located_attributes.append((getattr(messages, attr[0]), attr[1]))
             except AttributeError:
-                 pass
-        return tuple(located_attributes)
+                pass
+        return located_attributes
 
     def __init__(self):
-        PYFLAKES_MESSAGES_WARNING = ['AssertTuple', 'ImportStarUsage',
-                                     'ImportStarUsed', 'UnusedImport',
+        PYFLAKES_MESSAGES_WARNING = ['AssertTuple', ('ImportStarUsage', '*'),
+                                     ('ImportStarUsed', '*'), 'UnusedImport',
                                      'UnusedVariable']
         self.warnings = PyflakesPlugin.find_msg_attr(PYFLAKES_MESSAGES_WARNING)
         GObject.Object.__init__(self)
@@ -64,9 +65,11 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
         end.forward_to_line_end()
         return start, end
 
-    @staticmethod
-    def find_keyword(keyword, start, end):
+    def find_keyword(self, problem, start, end):
        tag_start, tag_end = start, end
+       keyword = [i[1] for i in self.warnings if i[1] != None and
+                                                 isinstance(problem, i[0])]
+       keyword = (keyword or problem.message_args)[0]
        while start.in_range(start, end):
            tag_start, tag_end = start.forward_search(keyword, 0, end)
            if tag_start.starts_word() and tag_end.ends_word():
@@ -81,10 +84,10 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
             for problem in self.check(document):
                 start, end = PyflakesPlugin.get_line_interval(
                                                   document, problem.lineno - 1)
-                start, end = PyflakesPlugin.find_keyword(
-                                           problem.message_args[0], start, end)
-                tag_type = self.warn_tag if \
-                           isinstance(problem, self.warnings) else self.err_tag
+                start, end = self.find_keyword(problem, start, end)
+                classes = tuple([i[0] for i in self.warnings])
+                tag_type = self.warn_tag if isinstance(problem, classes) \
+                                         else self.err_tag
                 document.apply_tag(tag_type, start, end)
         except SyntaxError as e:
             start, end = PyflakesPlugin.get_line_interval(
