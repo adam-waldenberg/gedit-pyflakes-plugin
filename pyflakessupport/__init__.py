@@ -1,6 +1,7 @@
 import ast
 from gi.repository import Gedit
 from gi.repository import GObject
+from gi.repository import Gtk
 from gi.repository import Pango
 from operator import attrgetter
 from pyflakes import checker
@@ -27,11 +28,14 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
         PYFLAKES_MESSAGES_WARNING = ['AssertTuple', ('ImportStarUsage', '*'),
                                      ('ImportStarUsed', '*'), 'UnusedImport',
                                      'UnusedVariable']
+        self.handlers = []
+        self.problems = []
         self.warnings = PyflakesPlugin.find_msg_attr(PYFLAKES_MESSAGES_WARNING)
         GObject.Object.__init__(self)
 
     def do_activate(self):
         self.document = self.view.get_buffer()
+        self.view.set_has_tooltip(True)
         self.err_tag = self.document.create_tag(None,
                                                 underline_set=True,
                                                 underline=Pango.Underline.ERROR)
@@ -40,16 +44,49 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
                                                  underline=Pango.Underline.ERROR,
                                                  foreground_set=True,
                                                  foreground='orange')
-        self.handler = self.document.connect('highlight-updated', self.do_recheck)
+        self.handlers = [
+            (self.document, self.document.connect('highlight-updated', self.do_recheck)),
+            (self.view, self.view.connect('query-tooltip', self.do_query_tooltip))
+        ]
 
     def do_deactivate(self):
-        self.document.disconnect(self.handler)
+        for i in self.handlers:
+            i[0].disconnect(i[1])
 
     def do_recheck(self, document, *args):
         self.hide_errors(document)
         language = document.get_language()
         if language and language.get_name() == 'Python':
             self.show_errors(document)
+
+    def do_query_tooltip(self, view, x, y, keyboard_mode, tooltip):
+        start = None
+        if keyboard_mode:
+            cursor_position = self.document.get_property('cursor-position')
+            start = self.document.get_iter_at_offset(cursor_position)
+        else:
+            try:
+                width = view.get_gutter(Gtk.TextWindowType.LEFT).get_window().get_width()
+            except AttributeError: # If there is no gutter...
+                width = 0
+            coords = view.window_to_buffer_coords(Gtk.TextWindowType.TEXT, x - width, y)
+            start,_ = view.get_iter_at_position(*coords)
+        return self.create_tooltip(tooltip, start)
+
+    def create_tooltip(self, tooltip, start):
+        try:
+            is_on_tooltip_line = lambda x: x.lineno == start.get_line() + 1
+            message = next(filter(is_on_tooltip_line, self.problems))
+            if start.has_tag(self.err_tag):
+                tooltip.set_markup("<b>" + str(message) + "</b>")
+                return True
+            elif start.has_tag(self.warn_tag):
+                tooltip.set_markup(str(message))
+                return True
+        except StopIteration:
+            pass
+        return False
+
 
     def hide_errors(self, document):
         bounds = document.get_bounds()
@@ -81,18 +118,19 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
 
     def show_errors(self, document):
         try:
-            for problem in self.check(document):
+            self.problems = self.check(document)
+            for problem in self.problems:
                 start, end = PyflakesPlugin.get_line_interval(
                                                   document, problem.lineno - 1)
                 start, end = self.find_keyword(problem, start, end)
                 classes = tuple([i[0] for i in self.warnings])
                 tag_type = self.warn_tag if isinstance(problem, classes) \
                                          else self.err_tag
-                document.apply_tag(tag_type, start, end)
+                self.document.apply_tag(tag_type, start, end)
         except SyntaxError as e:
-            start, end = PyflakesPlugin.get_line_interval(
-                                                  document, e.lineno - 1)
-            document.apply_tag(self.err_tag, start, end)
+            self.problems = [e]
+            start, end = PyflakesPlugin.get_line_interval(document, e.lineno - 1)
+            self.document.apply_tag(self.err_tag, start, end)
 
     def check(self, document):
         filename = document.get_short_name_for_display()
