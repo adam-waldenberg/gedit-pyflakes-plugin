@@ -40,12 +40,12 @@ class PyflakesPlugin(GObject.Object, Gedit.ViewActivatable):
                                                  underline=Pango.Underline.ERROR,
                                                  foreground_set=True,
                                                  foreground='orange')
-        self.handler = self.document.connect('highlight-updated', self.recheck)
+        self.handler = self.document.connect('highlight-updated', self.do_recheck)
 
     def do_deactivate(self):
         self.document.disconnect(self.handler)
 
-    def recheck(self, document, *args):
+    def do_recheck(self, document, *args):
         self.hide_errors(document)
         language = document.get_language()
         if language and language.get_name() == 'Python':
